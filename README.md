@@ -1,50 +1,66 @@
-# Parker Williams — Engineering Portfolio
+# Technical Projects
 
-Backend & Platform Engineer specializing in cloud infrastructure, identity systems, and distributed architecture.
+Documentation of production systems and side projects I've built. Mostly Go
+backend work, some hardware.
 
 ## Contents
 
-- [Case Studies](#case-studies)
+- [Production Work](#production-work)
   - [Multi-Tenant Cloud Platform](#multi-tenant-cloud-platform)
-- [Open Source](#open-source-projects)
+- [Side Projects](#side-projects)
+  - [Distributed Microservices](#distributed-microservices)
   - [Pico Environmental Sensor](#pico-environmental-sensor)
-- [Contact](#contact)
 
 ---
 
-## Case Studies
+## Production Work
 
 ### [Multi-Tenant Cloud Platform](./cloud-platform/)
 
-Designed and built backend automation for an enterprise cloud platform. Currently architecting migration from synchronous request handling to saga-based orchestration for resilience.
+Designed and built backend automation for an enterprise cloud platform.
+Currently architecting migration from synchronous request handling to saga-based
+orchestration for resilience.
 
 **Tech:** Go, PostgreSQL, Keycloak, VMware Cloud Director
 
 **Highlights:**
+
 - Solo backend engineer, end-to-end ownership
 - SSO/MFA integration (SAML, OIDC, LDAP)
 - Saga pattern for fault-tolerant provisioning
-- [Architecture decisions](./cloud-platform/decisions.md) ・ [Code samples](./cloud-platform/code-samples.md)
+- [Architecture decisions](./cloud-platform/decisions.md) ・
+  [Code samples](./cloud-platform/code-samples.md)
 
 ---
 
-## Open Source Projects
+## Side Projects
+
+### [Distributed Microservices](./distributed-microservices/)
+
+Production-grade microservices architecture in Go demonstrating multiple
+communication patterns (HTTP, RPC, gRPC, RabbitMQ) with API gateway,
+authentication, and event-driven design.
+
+**Tech:** Go, PostgreSQL, MongoDB, RabbitMQ, Docker, gRPC
+
+**Highlights:**
+
+- Four distinct communication protocols with real use cases
+- Database-per-service isolation
+- Full Docker Compose orchestration
+- [View source](https://github.com/pwilliams-ck/distributed-microservices)
+
+---
 
 ### [Pico Environmental Sensor](./pico-sensor/)
 
-Low-cost IoT monitoring system built with Raspberry Pi Pico W. Running 3+ years continuously through extreme temperatures with zero downtime.
+Low-cost IoT monitoring system built with Raspberry Pi Pico W. Running 3+ years
+continuously through extreme temperatures with zero downtime.
 
 **Tech:** MicroPython, Raspberry Pi Pico W
 
 **Highlights:**
+
 - Total hardware cost: <$20
 - Zero maintenance since deployment
 - [View source](https://github.com/pwilliams-ck/pico-sensor)
-
----
-
-## Contact
-
-- Email: prwilliams5@gmail.com
-- GitHub: [github.com/pwilliams-ck](https://github.com/pwilliams-ck)
-- LinkedIn: [linkedin.com/in/parker-williams-b84972150](https://linkedin.com/in/parker-williams-b84972150)
