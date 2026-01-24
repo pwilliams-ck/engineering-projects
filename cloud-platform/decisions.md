@@ -140,7 +140,7 @@ Selecting primary language for backend services.
 - Context propagation for timeouts/cancellation
 
 **Ecosystem fit:**
-- First-class SDKs for VMware, Keycloak, cloud providers
+- First-class SDKs for hypervisor APIs, Keycloak, cloud providers
 - Strong HTTP/REST tooling
 - Good LDAP libraries
 

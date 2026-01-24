@@ -21,7 +21,7 @@ Designed and built backend automation for an enterprise cloud platform.
 Currently architecting migration from synchronous request handling to saga-based
 orchestration for resilience.
 
-**Tech:** Go, PostgreSQL, Keycloak, VMware Cloud Director
+**Tech:** Go, PostgreSQL, Keycloak, on-prem hypervisor
 
 **Highlights:**
 
