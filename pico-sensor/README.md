@@ -23,18 +23,9 @@ Commercial solutions were expensive and overkill for the requirements.
 
 Built a self-contained sensor unit using the cheapest reliable parts available.
 
-```
-┌─────────────────────────────────────┐
-│         Protective Enclosure        │
-│  ┌─────────────┐    ┌────────────┐  │
-│  │ Pi Pico W   │────│ Sensor     │  │
-│  │             │    │ Module     │  │
-│  │ [LED]       │    └────────────┘  │
-│  └─────────────┘                    │
-│        │                            │
-│        └── WiFi ──► Network         │
-└─────────────────────────────────────┘
-```
+![Pico sensor unit](./images/pico-sensor-1.jpg)
+
+![Pico sensor deployment](./images/pico-sensor-2.jpg)
 
 **Hardware:**
 - Raspberry Pi Pico W (~$6)
