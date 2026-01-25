@@ -25,8 +25,6 @@ Built a self-contained sensor unit using the cheapest reliable parts available.
 
 ![Pico sensor unit](./images/pico-sensor-1.jpg)
 
-![Pico sensor deployment](./images/pico-sensor-2.jpg)
-
 **Hardware:**
 - Raspberry Pi Pico W (~$6)
 - Environmental sensor module
@@ -118,6 +116,8 @@ For multiple Picos, a Raspberry Pi hub would aggregate data and handle network c
 Was designing a datacenter power monitoring system before role change:
 
 **Concept:** Raspberry Pi units connected to end-of-row PDUs, providing real-time per-cabinet power data.
+
+![Datacenter PDU monitoring concept](./images/pico-sensor-2.jpg)
 
 ```
 ┌─────────────────────────────────────────────────┐
