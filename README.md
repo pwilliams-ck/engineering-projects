@@ -1,15 +1,15 @@
-# Technical Projects
+# Engineering Projects
 
-Documentation of production systems and side projects I've built. Mostly Go
-backend work, some hardware.
+Documentation of production systems and a few side projects I've built. Mostly
+Go backend work, some hardware.
 
 ## Contents
 
 - [Production Work](#production-work)
   - [Multi-Tenant Cloud Platform](#multi-tenant-cloud-platform)
+  - [Pi Pico Environmental Sensors](#pi-pico-environmental-sensors)
 - [Side Projects](#side-projects)
   - [Distributed Microservices](#distributed-microservices)
-  - [Pico Environmental Sensor](#pico-environmental-sensor)
 
 ---
 
@@ -31,6 +31,19 @@ orchestration for resilience.
 - [Architecture decisions](./cloud-platform/decisions.md) ・
   [Code samples](./cloud-platform/code-samples.md)
 
+### [Pi Pico Environmental Sensors](./pico-sensor/)
+
+Low-cost IoT monitoring system built with Raspberry Pi Pico W. Running 3+ years
+continuously through extreme temperatures with zero downtime.
+
+**Tech:** MicroPython, Raspberry Pi Pico W
+
+**Highlights:**
+
+- Total hardware cost: <$20
+- Zero maintenance since deployment
+- [View source](https://github.com/pwilliams-ck/pico-sensor)
+
 ---
 
 ## Side Projects
@@ -49,18 +62,3 @@ authentication, and event-driven design.
 - Database-per-service isolation
 - Full Docker Compose orchestration
 - [View source](https://github.com/pwilliams-ck/distributed-microservices)
-
----
-
-### [Pico Environmental Sensor](./pico-sensor/)
-
-Low-cost IoT monitoring system built with Raspberry Pi Pico W. Running 3+ years
-continuously through extreme temperatures with zero downtime.
-
-**Tech:** MicroPython, Raspberry Pi Pico W
-
-**Highlights:**
-
-- Total hardware cost: <$20
-- Zero maintenance since deployment
-- [View source](https://github.com/pwilliams-ck/pico-sensor)
