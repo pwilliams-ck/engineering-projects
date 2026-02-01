@@ -27,32 +27,45 @@ Needed an identity provider supporting SAML, OIDC, and LDAP federation for enter
 
 ---
 
-## 2. Monolith + Saga (Not Microservices)
+## 2. Monolith + River Queue (Not Microservices)
 
-**Status:** Accepted
+**Status:** Accepted (Updated)
 
 **Context:**
 Greenfield project with small team (solo engineer, 2 juniors onboarding). ~100 customer operations/day. Needed resilient coordination with external services (identity provider, cloud hypervisor, DR platform).
 
-**Decision:** Stay monolith, add saga orchestration for external service coordination. Don't extract microservices.
+**Decision:** Stay monolith, use [River](https://github.com/riverqueue/river) for durable job processing and workflow coordination. Don't extract microservices.
 
 **Rationale:**
 - The problem is unreliable external services, not internal scaling
-- Saga pattern solves that without distribution overhead
+- Durable job queue solves that without distribution overhead
 - Single deployment unit = simpler operations for small team
 - Microservices add: network boundaries, deployment complexity, distributed tracing, service discovery
 - None of those solve a problem we actually have
 - "If you can't build a well-structured monolith, what makes you think you can build microservices?"
 
+**Why River over custom saga orchestration:**
+- PostgreSQL-native — uses our existing database, no new infrastructure
+- Transactional job enqueue — jobs enqueue atomically with business data
+- Built-in retries, backoff, and dead-letter handling out of the box
+- Unique jobs prevent duplicate processing (replaces custom idempotency layer)
+- Periodic jobs for scheduled maintenance tasks
+- Job dependencies for multi-step workflows
+- Excellent observability with job state introspection
+- Active maintenance and Go-idiomatic API
+- Still a library, not a service — keeps single-binary deployment
+
 **Evaluated alternatives:**
+- **Custom saga orchestrator:** What we had. Worked, but reinvented patterns River provides battle-tested.
 - **Temporal:** Excellent workflow engine, but requires separate cluster. Overkill for current scale.
 - **Microservices:** Adds operational complexity without solving our actual problem.
 - **Keep synchronous:** Timeouts and partial failures make this untenable for multi-step provisioning.
 
 **Outcome:**
-- Saga orchestrator handles external service failures gracefully
+- River handles external service failures with automatic retries and backoff
+- Transactional enqueue ensures jobs are created only when business operations commit
 - Single binary deployment, easy for juniors to understand and debug
-- Clear upgrade path to Temporal if scale demands it
+- Clear upgrade path to Temporal if workflow complexity demands it
 
 ---
 
