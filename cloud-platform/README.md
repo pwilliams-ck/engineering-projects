@@ -26,7 +26,7 @@ Solo backend engineer responsible for:
 
 ### v1 — Synchronous Monolith (Current Production)
 
-The initial system prioritized minimal dependencies (only 1; LDAP, then Riverqueue state orchestration for v2) and speed-to-market. Currently uses synchronous request handlers in a Go modular monolith, state tracking requests via database calls feature is next.
+The initial system prioritized minimal dependencies (only 1 is LDAP) and speed-to-market. Currently uses synchronous request handlers in a Go modular monolith. State tracking requests with Riverqueue orchestration for v2 with database calls feature is next.
 
 ```mermaid
 flowchart TB
