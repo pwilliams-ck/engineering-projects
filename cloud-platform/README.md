@@ -264,7 +264,7 @@ Evaluated several approaches for workflow orchestration:
 | **RabbitMQ** | Same — adds infra without proportional benefit |
 | **PostgreSQL + Go** | Right-sized. ACID transactions, simple queries, already in stack |
 
-**Decision:** Hand-rolled ORCH orchestrator with PostgreSQL state. Polls for pending work or uses `pg_notify` for lightweight signaling. If we hit scale limits, Temporal is the upgrade path — but that's a good problem to have.
+**Decision:** Riverqueue orchestrator with PostgreSQL state. Polls for pending work. If we hit scale limits, a message broker is in the upgrade path — but that's a good problem to have.
 
 ---
 
