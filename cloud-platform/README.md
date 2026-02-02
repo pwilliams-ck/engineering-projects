@@ -241,7 +241,7 @@ CREATE INDEX idx_ORCH_steps_ORCH_id ON ORCH_steps(ORCH_id);
 
 ---
 
-## Why ORCH Pattern?
+## Why Orchestrator Pattern?
 
 | Requirement | Why ORCH Solves It |
 |-------------|-------------------|
@@ -253,7 +253,7 @@ CREATE INDEX idx_ORCH_steps_ORCH_id ON ORCH_steps(ORCH_id);
 
 ---
 
-## Why Roll Your Own ORCH?
+## Why Roll Your Own Orchestrator?
 
 Evaluated several approaches for workflow orchestration:
 
