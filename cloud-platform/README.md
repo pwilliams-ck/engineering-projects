@@ -18,7 +18,7 @@ Solo backend engineer responsible for:
 - SSO/MFA integration (Keycloak, SAML, OIDC, LDAP)
 - Automated provisioning pipelines
 - CI/CD infrastructure
-- v2 ORCH orchestration migration (in progress)
+- v2 orchestration migration (in progress)
 
 ---
 
