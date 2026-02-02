@@ -243,7 +243,7 @@ CREATE INDEX idx_ORCH_steps_ORCH_id ON ORCH_steps(ORCH_id);
 
 ## Why Orchestrator Pattern?
 
-| Requirement | Why ORCH Solves It |
+| Requirement | Why Orchestrator Solves It |
 |-------------|-------------------|
 | Long-running operations | Each step is independent, no HTTP timeout risk |
 | Partial failure handling | Compensating transactions rollback cleanly |
