@@ -12,6 +12,8 @@ Production-grade distributed microservices system built with Go, demonstrating e
 
 After working on monolithic systems, I wanted to understand *why* software gets built as microservices. The industry talks about microservices constantly, but the reasoning often felt hand-wavy.
 
+This is learned from a course by Trevor Sawler on Udemy. He came highly recommended with his extensive experience in multpiple business realms.
+
 Questions I wanted to answer:
 - When do multiple protocols actually matter?
 - What problems does database-per-service solve?
