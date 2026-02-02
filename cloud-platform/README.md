@@ -206,7 +206,7 @@ stateDiagram-v2
 
 ---
 
-## PostgreSQL ORCH Table Design
+## PostgreSQL Orchestrator Table Design
 
 ```sql
 -- ORCH instance tracking
