@@ -5,8 +5,8 @@
 Backend automation platform enabling enterprise customers to provision cloud infrastructure, SSO/MFA, and disaster recovery through a unified system.
 
 **Key outcomes:**
-- Reduced customer onboarding from hours of manual work to seconds
-- Maintained high-availability SLA across all integrations
+- Reduced customer onboarding from hours of manual work to under 20 seconds
+- Maintained high-availability SLA across all integrations 99.999% so far
 - Zero data loss during external service outages
 
 ---
@@ -18,7 +18,7 @@ Solo backend engineer responsible for:
 - SSO/MFA integration (Keycloak, SAML, OIDC, LDAP)
 - Automated provisioning pipelines
 - CI/CD infrastructure
-- v2 saga orchestration migration (in progress)
+- v2 ORCH orchestration migration (in progress)
 
 ---
 
@@ -26,7 +26,7 @@ Solo backend engineer responsible for:
 
 ### v1 — Synchronous Monolith (Current Production)
 
-The initial system prioritized speed-to-market with a synchronous Go monolith.
+The initial system prioritized minimal dependencies (only 2; LDAP, Riverqueue) and speed-to-market. Currently uses synchronous request handlers in a Go modular monolith, state tracking requests via database calls feature is next.
 
 ```mermaid
 flowchart TB
@@ -68,9 +68,9 @@ flowchart TB
 
 ---
 
-### v2 — Saga Pattern with PostgreSQL (In Development)
+### v2 — Orchestration Pattern with River & PostgreSQL (In Development)
 
-Adding saga orchestration to the monolith for resilience and auditability. Same deployment model, better failure handling.
+Adding orchestration to the monolith for resilience and durability. Same deployment model, better failure handling.
 
 ```mermaid
 flowchart TB
@@ -79,9 +79,9 @@ flowchart TB
         NG[Nginx]
     end
 
-    subgraph "Go Monolith"
+    subgraph "Go Modular Monolith"
         API[API Handler]
-        SAGA[Saga Orchestrator]
+        ORCH[Orchestrator]
         AUTH[Auth Module]
         PROV[Provisioning Module]
         DRS[DR Module]
@@ -90,96 +90,96 @@ flowchart TB
     DB[(PostgreSQL)]
 
     subgraph External
-        VCD[Cloud Hypervisor]
+        CH[Cloud Hypervisor]
         KC[Identity Provider]
         AD[Directory Service]
         DR[DR Platform]
     end
 
     CRM -->|Webhook| NG --> API
-    API --> SAGA
-    SAGA <-->|State| DB
-    SAGA --> AUTH --> KC
+    API --> ORCH
+    ORCH <-->|State| DB
+    ORCH --> AUTH --> KC
     AUTH --> AD
-    SAGA --> PROV --> VCD
-    SAGA --> DRS --> DR
+    ORCH --> PROV --> CH
+    ORCH --> DRS --> DR
 ```
 
 **Why stay monolith?**
-- Small team (solo engineer + 2 juniors onboarding)
+- Small team (solo engineer + maybe 2 juniors onboarding)
 - ~100 operations/day doesn't justify distributed complexity
-- Saga pattern solves the actual problem: coordinating unreliable external services
-- Can extract services later if scale demands it
+- Orchestration pattern solves the actual problem: coordinating unreliable external services
+- Can extract modular services later if scale demands it
 
 ---
 
-## Saga: Customer Onboarding Flow
+## Orchestrator: Customer Onboarding Flow
 
 ```mermaid
 sequenceDiagram
     participant CRM as CRM
     participant API as API Gateway
-    participant Saga as Saga Orchestrator
+    participant ORCH as Orchestrator
     participant DB as PostgreSQL
     participant Auth as Auth Service
     participant Prov as Provisioning
     participant DRS as DR Service
 
     CRM->>API: New Customer Webhook
-    API->>Saga: Start Onboarding Saga
-    Saga->>DB: Create saga (PENDING)
+    API->>ORCH: Start Onboarding ORCH
+    ORCH->>DB: Create ORCH (PENDING)
 
-    Saga->>Auth: Create tenant in IdP
-    Auth-->>Saga: Success
-    Saga->>DB: Update (AUTH_COMPLETE)
+    ORCH->>Auth: Create tenant in IdP
+    Auth-->>ORCH: Success
+    ORCH->>DB: Update (AUTH_COMPLETE)
 
-    Saga->>Prov: Provision cloud resources
-    Prov-->>Saga: Success
-    Saga->>DB: Update (PROV_COMPLETE)
+    ORCH->>Prov: Provision cloud resources
+    Prov-->>ORCH: Success
+    ORCH->>DB: Update (PROV_COMPLETE)
 
-    Saga->>DRS: Configure replication
-    DRS-->>Saga: Success
-    Saga->>DB: Update (COMPLETED)
+    ORCH->>DRS: Configure replication
+    DRS-->>ORCH: Success
+    ORCH->>DB: Update (COMPLETED)
 
-    Saga->>CRM: Callback (success)
+    ORCH->>CRM: Callback (success)
 ```
 
 ---
 
-## Saga: Compensation (Rollback) Flow
+## Orchestrator: Compensation (Rollback) Flow
 
-When a step fails, the saga reverses previously completed steps in order.
+When a step fails, the ORCH reverses previously completed steps in order.
 
 ```mermaid
 sequenceDiagram
-    participant Saga as Saga Orchestrator
+    participant ORCH as Orchestrator
     participant DB as PostgreSQL
     participant Auth as Auth Service
     participant Prov as Provisioning
     participant DRS as DR Service
 
-    Note over Saga: DR Service fails
+    Note over ORCH: DR Service fails
 
-    Saga->>DB: Update (DR_FAILED)
+    ORCH->>DB: Update (DR_FAILED)
 
-    Saga->>Prov: Compensate: Delete cloud resources
-    Prov-->>Saga: Rolled back
-    Saga->>DB: Update (PROV_COMPENSATED)
+    ORCH->>Prov: Compensate: Delete cloud resources
+    Prov-->>ORCH: Rolled back
+    ORCH->>DB: Update (PROV_COMPENSATED)
 
-    Saga->>Auth: Compensate: Delete tenant
-    Auth-->>Saga: Rolled back
-    Saga->>DB: Update (AUTH_COMPENSATED)
+    ORCH->>Auth: Compensate: Delete tenant
+    Auth-->>ORCH: Rolled back
+    ORCH->>DB: Update (AUTH_COMPENSATED)
 
-    Saga->>DB: Update (SAGA_ROLLED_BACK)
+    ORCH->>DB: Update (SAGA_ROLLED_BACK)
 ```
 
 ---
 
-## Saga State Machine
+## Orchestrator State Machine
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: Saga created
+    [*] --> PENDING: Job created
 
     PENDING --> AUTH_IN_PROGRESS: Start auth step
     AUTH_IN_PROGRESS --> AUTH_COMPLETE: Success
@@ -206,11 +206,11 @@ stateDiagram-v2
 
 ---
 
-## PostgreSQL Saga Table Design
+## PostgreSQL ORCH Table Design
 
 ```sql
--- Saga instance tracking
-CREATE TABLE sagas (
+-- ORCH instance tracking
+CREATE TABLE ORCHS (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type VARCHAR(50) NOT NULL,           -- 'customer_onboarding', etc.
     state VARCHAR(50) NOT NULL,          -- Current state
@@ -222,10 +222,10 @@ CREATE TABLE sagas (
     error TEXT
 );
 
--- Saga step history (audit log)
-CREATE TABLE saga_steps (
+-- ORCH step history (audit log)
+CREATE TABLE ORCH_steps (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    saga_id UUID REFERENCES sagas(id),
+    ORCH_id UUID REFERENCES ORCHS(id),
     step VARCHAR(50) NOT NULL,
     status VARCHAR(20) NOT NULL,         -- 'started', 'completed', 'failed', 'compensated'
     input JSONB,
@@ -235,25 +235,25 @@ CREATE TABLE saga_steps (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_sagas_state ON sagas(state);
-CREATE INDEX idx_saga_steps_saga_id ON saga_steps(saga_id);
+CREATE INDEX idx_ORCHS_state ON ORCHS(state);
+CREATE INDEX idx_ORCH_steps_ORCH_id ON ORCH_steps(ORCH_id);
 ```
 
 ---
 
-## Why Saga Pattern?
+## Why ORCH Pattern?
 
-| Requirement | Why Saga Solves It |
+| Requirement | Why ORCH Solves It |
 |-------------|-------------------|
 | Long-running operations | Each step is independent, no HTTP timeout risk |
 | Partial failure handling | Compensating transactions rollback cleanly |
 | Auditability | Every state transition persisted in PostgreSQL |
-| Resumability | Saga can resume after crash from last known state |
+| Resumability | ORCH can resume after crash from last known state |
 | Observability | Clear state machine makes debugging trivial |
 
 ---
 
-## Why Roll Your Own Saga?
+## Why Roll Your Own ORCH?
 
 Evaluated several approaches for workflow orchestration:
 
@@ -264,7 +264,7 @@ Evaluated several approaches for workflow orchestration:
 | **RabbitMQ** | Same — adds infra without proportional benefit |
 | **PostgreSQL + Go** | Right-sized. ACID transactions, simple queries, already in stack |
 
-**Decision:** Hand-rolled saga orchestrator with PostgreSQL state. Polls for pending work or uses `pg_notify` for lightweight signaling. If we hit scale limits, Temporal is the upgrade path — but that's a good problem to have.
+**Decision:** Hand-rolled ORCH orchestrator with PostgreSQL state. Polls for pending work or uses `pg_notify` for lightweight signaling. If we hit scale limits, Temporal is the upgrade path — but that's a good problem to have.
 
 ---
 
