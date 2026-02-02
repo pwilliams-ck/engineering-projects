@@ -14,11 +14,13 @@ Needed an identity provider supporting SAML, OIDC, and LDAP federation for enter
 **Decision:** Keycloak
 
 **Rationale:**
+- Tenants would have to enter DNS text record into own infrastructure (preferred simpler onboarding)
 - Full protocol support (SAML 2.0, OIDC, LDAP) in a single deployment
 - Self-hosted = no per-user licensing costs at scale
 - Extensive customization for tenant isolation
 - Built-in user federation with Active Directory
 - Duo would require additional integration layers for SAML/OIDC
+
 
 **Tradeoffs:**
 - Keycloak requires operational investment (upgrades, HA configuration)
