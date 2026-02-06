@@ -1,14 +1,13 @@
 # Engineering Projects
 
-Documentation of production systems and a few side projects I've built. Mostly
-Go backend work, some hardware.
+Software Engineer — Backend systems, identity & access management, cloud
+infrastructure. Go.
 
 ## Contents
 
 - [Production Work](#production-work)
   - [Multi-Tenant Cloud Platform](#multi-tenant-cloud-platform)
-  - [Pi Pico Environmental Sensors](#pi-pico-environmental-sensors)
-- [Side Projects](#side-projects)
+- [Learning & Exploration](#learning-and-exploration)
   - [Distributed Microservices](#distributed-microservices)
 
 ---
@@ -17,9 +16,10 @@ Go backend work, some hardware.
 
 ### [Multi-Tenant Cloud Platform](./cloud-platform/)
 
-Designed and built backend automation for an enterprise cloud platform.
-Currently architecting migration from synchronous request handling to saga-based
-orchestration for resilience.
+Backend automation platform I solely architected and engineered. Enterprise
+identity federation (SAML, SCIM, LDAPS), cloud provisioning, and disaster
+recovery through a unified Go orchestration system. Serves 50+ enterprise
+clients.
 
 **Tech:** Go, PostgreSQL, Keycloak, on-prem hypervisor
 
@@ -27,32 +27,21 @@ orchestration for resilience.
 
 - Solo backend engineer, end-to-end ownership
 - SSO/MFA integration (SAML, OIDC, LDAP)
-- Saga pattern for fault-tolerant provisioning
-- [Architecture decisions](./cloud-platform/decisions.md) ・
-  [Code samples](./cloud-platform/code-samples.md)
+- Orchestration pattern for fault-tolerant provisioning
 
-### [Pi Pico Environmental Sensors](./pico-sensor/)
+-> [Architecture decisions](./cloud-platform/decisions.md)
 
-Low-cost IoT monitoring system built with Raspberry Pi Pico W. Running 3+ years
-continuously through extreme temperatures with zero downtime.
-
-**Tech:** MicroPython, Raspberry Pi Pico W
-
-**Highlights:**
-
-- Total hardware cost: <$20
-- Zero maintenance since deployment
-- [View source](https://github.com/pwilliams-ck/pico-sensor)
+-> [Code samples](./cloud-platform/code-samples.md)
 
 ---
 
-## Side Projects
+## Learning and Exploration
 
 ### [Distributed Microservices](./distributed-microservices/)
 
-Production-grade microservices architecture in Go demonstrating multiple
-communication patterns (HTTP, RPC, gRPC, RabbitMQ) with API gateway,
-authentication, and event-driven design.
+Go microservices ecosystem exploring HTTP, RPC, gRPC, and event-driven
+communication patterns. Built following Trevor Sawler's course to understand
+when distributed architecture is and isn't warranted.
 
 **Tech:** Go, PostgreSQL, MongoDB, RabbitMQ, Docker, gRPC
 
@@ -61,4 +50,5 @@ authentication, and event-driven design.
 - Four distinct communication protocols with real use cases
 - Database-per-service isolation
 - Full Docker Compose orchestration
-- [View source](https://github.com/pwilliams-ck/distributed-microservices)
+
+-> [View source](https://github.com/pwilliams-ck/distributed-microservices)

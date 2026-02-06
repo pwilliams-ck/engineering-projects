@@ -6,6 +6,7 @@ Anonymized patterns from production Go services.
 
 ## Table of Contents
 
+- [SAML Federation Configuration](#saml-federation-configuration)
 - [Graceful Shutdown](#graceful-shutdown)
 - [Retry with Exponential Backoff](#retry-with-exponential-backoff)
 - [Functional Options Pattern](#functional-options-pattern)
@@ -16,6 +17,218 @@ Anonymized patterns from production Go services.
 - [Input Validation](#input-validation)
 
 ---
+
+## SAML Federation Configuration
+
+Programmatic SAML IdP metadata configuration for multi-tenant SSO. Each tenant
+gets isolated federation settings with their own signing certificate, entity ID,
+and SSO endpoints injected into the cloud hypervisor API.
+
+Reads use standard `encoding/xml` unmarshal. Writes use `text/template` for XML
+construction — Go's `encoding/xml` struggles with nested namespace prefixes in
+SAML metadata (`md:`, `ds:`) and the hypervisor API expects the inner metadata
+as HTML-entity-escaped XML within an outer XML envelope. Refactor path is
+two-layer marshal with `html.EscapeString` for the inner payload.
+
+```go
+// GetOrganizationSAMLSettings retrieves the SAML settings for a specific organization.
+func (c *HypervisorClient) GetOrganizationSAMLSettings(ctx context.Context, token string, orgId string) (*OrgFederationSettings, error) {
+ path := fmt.Sprintf("/api/admin/org/%s/settings/federation", orgId)
+
+ req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
+ if err != nil {
+  return nil, fmt.Errorf("error creating request: %w", err)
+ }
+
+ req.Header.Set("Accept", fmt.Sprintf("application/*;version=%s", c.Version))
+ req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+ resp, err := c.client.DoWithRetry(req)
+ if err != nil {
+  return nil, fmt.Errorf("error sending request: %w", err)
+ }
+ defer func() {
+  if err := resp.Body.Close(); err != nil {
+   fmt.Printf("error closing response body: %v\n", err)
+  }
+ }()
+
+ if resp.StatusCode != http.StatusOK {
+  body, _ := io.ReadAll(resp.Body)
+  return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+ }
+
+ body, err := io.ReadAll(resp.Body)
+ if err != nil {
+  return nil, fmt.Errorf("error reading response body: %w", err)
+ }
+
+ var settings OrgFederationSettings
+ if err := xml.Unmarshal(body, &settings); err != nil {
+  return nil, fmt.Errorf("error unmarshaling XML: %w", err)
+ }
+
+ return &settings, nil
+}
+
+// UpdateOrganizationSAMLSettings updates the SAML settings for a specific organization.
+// Template strings are used to build the XML body, until we can build a custom XML marshaller.
+func (c *HypervisorClient) UpdateOrganizationSAMLSettings(
+ ctx context.Context,
+ token,
+ orgId,
+ cert,
+ entityID,
+ ssoUrl,
+ keyName,
+ orgName string,
+ settings OrgFederationSettings,
+) (*OrgFederationSettings, error) {
+ path := fmt.Sprintf("/api/admin/org/%s/settings/federation", orgId)
+
+ settings.Enabled = true
+
+ type templateData struct {
+  OrgFederationSettings
+  Cert     string
+  EntityID string
+  SsoUrl   string
+  KeyName  string
+  OrgName  string
+ }
+
+ data := templateData{
+  OrgFederationSettings: settings,
+  Cert:                  cert,
+  EntityID:              entityID,
+  SsoUrl:                ssoUrl,
+  KeyName:               keyName,
+  OrgName:               orgName,
+ }
+
+ const xmlTemplate = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<OrgFederationSettings xmlns="http://www.vmware.com/vcloud/v1.5" ` +
+  `xmlns:vmext="http://www.vmware.com/vcloud/extension/v1.5" ` +
+  `xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1" ` +
+  `href="{{.Href}}" type="{{.Type}}">` +
+  `{{range .Link}}` +
+  `<Link rel="{{.Rel}}" href="{{.Href}}" type="{{.Type}}"/>` +
+  `{{end}}` +
+  `<SAMLMetadata>` +
+  `&lt;md:EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" ` +
+  `xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" ` +
+  `xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ` +
+  `xmlns:ds="http://www.w3.org/2000/09/xmldsig#" ` +
+  `entityID="{{.EntityID}}"&gt;&#13;` +
+  `&lt;md:IDPSSODescriptor WantAuthnRequestsSigned="true" ` +
+  `protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"&gt;` +
+  `&lt;md:KeyDescriptor use="signing"&gt;` +
+  `&lt;ds:KeyInfo&gt;` +
+  `&lt;ds:KeyName&gt;{{.KeyName}}&lt;/ds:KeyName&gt;` +
+  `&lt;ds:X509Data&gt;` +
+  `&lt;ds:X509Certificate&gt;{{.Cert}}&lt;/ds:X509Certificate&gt;` +
+  `&lt;/ds:X509Data&gt;` +
+  `&lt;/ds:KeyInfo&gt;` +
+  `&lt;/md:KeyDescriptor&gt;` +
+  `&lt;md:ArtifactResolutionService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" ` +
+  `Location="{{.SsoUrl}}/resolve" index="0"/&gt;` +
+  `&lt;md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:NameIDFormat&gt;urn:oasis:names:tc:SAML:2.0:nameid-format:persistent&lt;/md:NameIDFormat&gt;` +
+  `&lt;md:NameIDFormat&gt;urn:oasis:names:tc:SAML:2.0:nameid-format:transient&lt;/md:NameIDFormat&gt;` +
+  `&lt;md:NameIDFormat&gt;urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified&lt;/md:NameIDFormat&gt;` +
+  `&lt;md:NameIDFormat&gt;urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress&lt;/md:NameIDFormat&gt;` +
+  `&lt;md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Artifact" ` +
+  `Location="{{.SsoUrl}}"/&gt;` +
+  `&lt;/md:IDPSSODescriptor&gt;` +
+  `&lt;/md:EntityDescriptor&gt;` +
+  `</SAMLMetadata>` +
+  `<Enabled>{{.Enabled}}</Enabled>` +
+  `<CertificateExpiration>{{.CertificateExpiration}}</CertificateExpiration>` +
+  `<SigningCertificateExpiration>{{.SigningCertificateExpiration}}</SigningCertificateExpiration>` +
+  `<EncryptionCertificateExpiration>{{.EncryptionCertificateExpiration}}</EncryptionCertificateExpiration>` +
+  `<SamlSPEntityId>{{.OrgName}}</SamlSPEntityId>` +
+  `<SigningCertLibraryItemId>{{.SigningCertLibraryItemId}}</SigningCertLibraryItemId>` +
+  `<EncryptionCertLibraryItemId>{{.EncryptionCertLibraryItemId}}</EncryptionCertLibraryItemId>` +
+  `</OrgFederationSettings>`
+
+ tmpl, err := template.New("xml").Parse(xmlTemplate)
+ if err != nil {
+  return nil, fmt.Errorf("error parsing template: %w", err)
+ }
+
+ var buf bytes.Buffer
+ if err = tmpl.Execute(&buf, data); err != nil {
+  return nil, fmt.Errorf("error executing template: %w", err)
+ }
+
+ req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.BaseURL+path, &buf)
+ if err != nil {
+  return nil, fmt.Errorf("error creating request: %w", err)
+ }
+
+ req.Header.Set("Accept", fmt.Sprintf("application/*;version=%s", c.Version))
+ req.Header.Set("Content-Type", "application/vnd.vmware.admin.organizationFederationSettings+xml")
+ req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+ resp, err := c.client.DoWithRetry(req)
+ if err != nil {
+  return nil, fmt.Errorf("error sending request: %w", err)
+ }
+ defer func() {
+  if err := resp.Body.Close(); err != nil {
+   fmt.Printf("error closing response body: %v\n", err)
+  }
+ }()
+
+ if resp.StatusCode != http.StatusOK {
+  body, _ := io.ReadAll(resp.Body)
+  return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+ }
+
+ body, err := io.ReadAll(resp.Body)
+ if err != nil {
+  return nil, fmt.Errorf("error reading response body: %w", err)
+ }
+
+ var updatedSettings OrgFederationSettings
+ if err = xml.Unmarshal(body, &updatedSettings); err != nil {
+  return nil, fmt.Errorf("error unmarshaling XML: %w", err)
+ }
+
+ return &updatedSettings, nil
+}
+```
+
+**Key points:**
+
+- Each tenant gets isolated SAML federation — signing cert, entity ID, SSO/SLO
+  endpoints are per-organization
+- IdP metadata follows SAML 2.0 spec: `EntityDescriptor` → `IDPSSODescriptor`
+  with `KeyDescriptor` for X509 signing, four SSO binding types (HTTP-POST,
+  HTTP-Redirect, SOAP, Artifact), logout services, and NameID format negotiation
+  (persistent, transient, email, unspecified)
+- Existing settings are fetched first to preserve hypervisor-managed fields
+  (links, cert expirations, library item IDs) before overwriting federation
+  config
+- `text/template` used for writes because the hypervisor API expects SAML
+  metadata as HTML-entity-escaped XML nested inside an outer XML envelope — Go's
+  `encoding/xml` can't cleanly marshal nested namespace prefixes (`md:`, `ds:`,
+  `saml:`) in this structure
+- Reads use standard `encoding/xml` unmarshal — the asymmetry is a pragmatic
+  tradeoff under deadline, not a permanent design choice
 
 ## Graceful Shutdown
 
@@ -65,6 +278,7 @@ func (app *application) serve() error {
 ```
 
 **Key points:**
+
 - Channel-based coordination between main goroutine and signal handler
 - Context with timeout prevents hanging on slow connections
 - Differentiates between normal shutdown (`http.ErrServerClosed`) and errors
@@ -140,6 +354,7 @@ func (c *retryableHTTPClient) DoWithRetry(req *http.Request) (*http.Response, er
 ```
 
 **Key points:**
+
 - Body buffering allows POST/PUT retry without re-reading
 - Jitter prevents thundering herd on service recovery
 - Context cancellation respected between retries
@@ -198,6 +413,7 @@ func WithRetryPolicy(maxRetries int, delay, jitter time.Duration, policy RetryPo
 ```
 
 **Usage:**
+
 ```go
 // Production: uses environment defaults
 client := NewClient()
@@ -240,6 +456,7 @@ func createHTTPClient() *http.Client {
 ```
 
 **Key points:**
+
 - TLS 1.2 minimum (security baseline)
 - Connection pooling prevents socket exhaustion
 - HTTP/2 enabled for multiplexing
@@ -369,6 +586,7 @@ func (app *application) unauthorizedResponse(w http.ResponseWriter, r *http.Requ
 ```
 
 **Key points:**
+
 - Generic `errorResponse` handles all cases
 - Fallback to raw 500 if JSON writing fails
 - User-facing messages don't leak internal details
@@ -411,6 +629,7 @@ func ValidateWebhookSignature(signature, timestamp, secret string, body []byte, 
 ```
 
 **Key points:**
+
 - Timestamp in signature prevents replay attacks
 - `maxAge` configurable per-endpoint sensitivity
 - Constant-time comparison would be better (use `hmac.Equal` in production)
@@ -469,6 +688,7 @@ func Unique[T comparable](values []T) bool {
 ```
 
 **Usage:**
+
 ```go
 func (app *application) handleCreateUser(w http.ResponseWriter, r *http.Request) {
     var input struct {
@@ -498,11 +718,12 @@ func (app *application) handleCreateUser(w http.ResponseWriter, r *http.Request)
 ```
 
 **Response on validation failure:**
+
 ```json
 {
-    "error": {
-        "email": "must be valid",
-        "role": "must be admin, user, or viewer"
-    }
+  "error": {
+    "email": "must be valid",
+    "role": "must be admin, user, or viewer"
+  }
 }
 ```

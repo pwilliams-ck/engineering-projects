@@ -1,6 +1,7 @@
 # Technical Decisions
 
-Architecture Decision Records (ADRs) for key choices made during platform development.
+Architecture Decision Records (ADRs) for key choices made during platform
+development.
 
 ---
 
@@ -8,21 +9,24 @@ Architecture Decision Records (ADRs) for key choices made during platform develo
 
 **Status:** Accepted
 
-**Context:**
-Needed an identity provider supporting SAML, OIDC, and LDAP federation for enterprise SSO. Evaluated Keycloak (open source) vs Duo (commercial).
+**Context:** Needed an identity provider supporting SAML, OIDC, and LDAP
+federation for enterprise SSO. Evaluated Keycloak (open source) vs Duo
+(commercial).
 
 **Decision:** Keycloak
 
 **Rationale:**
-- Tenants would have to enter DNS text record into own infrastructure (preferred simpler onboarding)
+
+- Tenants would have to enter DNS text record into own infrastructure (preferred
+  simpler onboarding)
 - Full protocol support (SAML 2.0, OIDC, LDAP) in a single deployment
 - Self-hosted = no per-user licensing costs at scale
 - Extensive customization for tenant isolation
 - Built-in user federation with Active Directory
 - Duo would require additional integration layers for SAML/OIDC
 
-
 **Tradeoffs:**
+
 - Keycloak requires operational investment (upgrades, HA configuration)
 - Duo has better out-of-box MFA UX
 - Mitigated by integrating hardware token support directly into Keycloak
@@ -33,20 +37,27 @@ Needed an identity provider supporting SAML, OIDC, and LDAP federation for enter
 
 **Status:** Accepted (Updated)
 
-**Context:**
-Greenfield project with small team (solo engineer, 2 juniors onboarding). ~100 customer operations/day. Needed resilient coordination with external services (identity provider, cloud hypervisor, DR platform).
+**Context:** Greenfield project with small team (solo engineer, 2 juniors
+onboarding). ~100 customer operations/day. Needed resilient coordination with
+external services (identity provider, cloud hypervisor, DR platform).
 
-**Decision:** Stay monolith, use [River](https://github.com/riverqueue/river) for durable job processing and workflow coordination. Don't extract microservices.
+**Decision:** Stay monolith, use [River](https://github.com/riverqueue/river)
+for durable job processing and workflow coordination. Don't extract
+microservices.
 
 **Rationale:**
+
 - The problem is unreliable external services, not internal scaling
 - Durable job queue solves that without distribution overhead
 - Single deployment unit = simpler operations for small team
-- Microservices add: network boundaries, deployment complexity, distributed tracing, service discovery
+- Microservices add: network boundaries, deployment complexity, distributed
+  tracing, service discovery
 - None of those solve a problem we actually have
-- "If you can't build a well-structured monolith, what makes you think you can build microservices?"
+- "If you can't build a well-structured monolith, what makes you think you can
+  build microservices?"
 
 **Why River over custom saga orchestration:**
+
 - PostgreSQL-native — uses our existing database, no new infrastructure
 - Transactional job enqueue — jobs enqueue atomically with business data
 - Built-in retries, backoff, and dead-letter handling out of the box
@@ -58,14 +69,21 @@ Greenfield project with small team (solo engineer, 2 juniors onboarding). ~100 c
 - Still a library, not a service — keeps single-binary deployment
 
 **Evaluated alternatives:**
-- **Custom saga orchestrator:** What we had. Worked, but reinvented patterns River provides battle-tested.
-- **Temporal:** Excellent workflow engine, but requires separate cluster. Overkill for current scale.
-- **Microservices:** Adds operational complexity without solving our actual problem.
-- **Keep synchronous:** Timeouts and partial failures make this untenable for multi-step provisioning.
+
+- **Custom saga orchestrator:** What we had. Worked, but reinvented patterns
+  River provides battle-tested.
+- **Temporal:** Excellent workflow engine, but requires separate cluster.
+  Overkill for current scale.
+- **Microservices:** Adds operational complexity without solving our actual
+  problem.
+- **Keep synchronous:** Timeouts and partial failures make this untenable for
+  multi-step provisioning.
 
 **Outcome:**
+
 - River handles external service failures with automatic retries and backoff
-- Transactional enqueue ensures jobs are created only when business operations commit
+- Transactional enqueue ensures jobs are created only when business operations
+  commit
 - Single binary deployment, easy for juniors to understand and debug
 - Clear upgrade path to Temporal if workflow complexity demands it
 
@@ -75,18 +93,22 @@ Greenfield project with small team (solo engineer, 2 juniors onboarding). ~100 c
 
 **Status:** Accepted
 
-**Context:**
-Integrating with customer Active Directory instances for user federation.
+**Context:** Integrating with customer Active Directory instances for user
+federation.
 
-**Decision:** Require LDAPS (LDAP over TLS) for all AD connections. No plaintext LDAP.
+**Decision:** Require LDAPS (LDAP over TLS) for all AD connections. No plaintext
+LDAP.
 
 **Rationale:**
-- LDAP transmits credentials in cleartext (even with SASL, bind passwords are exposed)
+
+- LDAP transmits credentials in cleartext (even with SASL, bind passwords are
+  exposed)
 - Enterprise customers expect TLS for directory traffic
 - Certificate validation prevents MITM attacks
 - Minimal implementation difference — just TLS config
 
 **Implementation notes:**
+
 - Accept customer CA certificates for internal PKI
 - Validate certificate chains, don't skip verification
 - Log certificate expiration warnings
@@ -97,14 +119,16 @@ Integrating with customer Active Directory instances for user federation.
 
 **Status:** Accepted
 
-**Context:**
-Webhooks from CRM can be delivered multiple times. External APIs (cloud hypervisor, identity provider) may timeout without indicating success/failure.
+**Context:** Webhooks from CRM can be delivered multiple times. External APIs
+(cloud hypervisor, identity provider) may timeout without indicating
+success/failure.
 
 **Decision:** Idempotency keys + at-least-once delivery assumption
 
 **Patterns used:**
 
 **Idempotency keys:**
+
 ```go
 // Store operation intent before execution
 func (s *Service) ProvisionTenant(ctx context.Context, req Request) error {
@@ -123,11 +147,13 @@ func (s *Service) ProvisionTenant(ctx context.Context, req Request) error {
 ```
 
 **Idempotent external calls:**
+
 - Use PUT over POST where APIs support it
 - Include client-generated request IDs
 - Query before create when possible
 
 **Saga compensation:**
+
 - Each step checks current state before acting
 - Compensation is also idempotent (delete non-existent = success)
 
@@ -137,34 +163,38 @@ func (s *Service) ProvisionTenant(ctx context.Context, req Request) error {
 
 **Status:** Accepted
 
-**Context:**
-Selecting primary language for backend services.
+**Context:** Selecting primary language for backend services.
 
 **Decision:** Go
 
 **Rationale:**
 
 **Operational simplicity:**
+
 - Single static binary, no runtime dependencies
 - Cross-compilation trivial
 - Small container images (~10-20MB)
 
 **Concurrency model:**
+
 - Goroutines map well to webhook-driven workloads
 - Channels for coordination without shared memory bugs
 - Context propagation for timeouts/cancellation
 
 **Ecosystem fit:**
+
 - First-class SDKs for hypervisor APIs, Keycloak, cloud providers
 - Strong HTTP/REST tooling
 - Good LDAP libraries
 
 **Team scalability:**
+
 - Minimal language features = consistent code across team
 - Fast onboarding for new engineers
 - `gofmt` eliminates style debates
 
 **Considered alternatives:**
+
 - Rust: Higher learning curve, slower iteration
 - Python: Deployment complexity, runtime errors
 - Java/Kotlin: JVM overhead, slower startup
@@ -175,12 +205,13 @@ Selecting primary language for backend services.
 
 **Status:** Accepted
 
-**Context:**
-Needed persistent storage for tenant configuration, saga state, and audit logs.
+**Context:** Needed persistent storage for tenant configuration, saga state, and
+audit logs.
 
 **Decision:** PostgreSQL for everything (no polyglot persistence initially)
 
 **Rationale:**
+
 - JSONB covers semi-structured data needs without separate document store
 - ACID transactions critical for saga state consistency
 - Mature tooling, extensive documentation
@@ -188,6 +219,7 @@ Needed persistent storage for tenant configuration, saga state, and audit logs.
 - Can extract specialized stores later if needed
 
 **Schema approach:**
+
 - Relational tables for core entities
 - JSONB columns for flexible/evolving attributes
 - Avoid over-normalization early
@@ -198,20 +230,49 @@ Needed persistent storage for tenant configuration, saga state, and audit logs.
 
 **Status:** Accepted
 
-**Context:**
-Need TLS termination, rate limiting, and request routing in front of Go services.
+**Context:** Need TLS termination, rate limiting, and request routing in front
+of Go services.
 
 **Decision:** Nginx over dedicated API gateway products
 
 **Rationale:**
+
 - Already in operational toolbox
 - Excellent TLS termination performance
 - Simple configuration for our routing needs
 - No vendor lock-in
-- Evaluated Kong, Traefik — added complexity without proportional benefit for our scale
+- Evaluated Kong, Traefik — added complexity without proportional benefit for
+  our scale
 
 **Configuration approach:**
+
 - TLS termination at Nginx
 - Proxy to Go services over localhost
 - Rate limiting per endpoint
 - Request ID injection for tracing
+
+## 8. SAML for Enterprise SSO
+
+**Status:** Accepted
+
+**Context:** Enterprise customers bring their own identity providers (Azure AD,
+Okta, on-prem ADFS). Need to support SSO across all tenant organizations in the
+cloud hypervisor.
+
+**Decision:** SAML 2.0 as primary SSO protocol, programmatically configured per
+tenant via hypervisor federation API.
+
+**Rationale:**
+
+- Enterprise customers overwhelmingly use SAML, it's the common denominator
+  across Azure AD, Okta, and ADFS
+- Hypervisor API has mature SAML federation support with per-org isolationo
+- Keycloak acts as identity broker, federating AD users via LDAPS and exposing
+  SAML assertions to the hypervisor
+
+**Tradeoffs:**
+
+- OIDC would be simpler for modern IdPs but less universally supported in the
+  enterprise customer base
+- SAML metadata construction requires XML handling that Go's stdlib doesn't
+  support cleanly (see code samples)
